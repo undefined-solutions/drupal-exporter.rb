@@ -58,6 +58,7 @@ module Contentful
           result[:author] = author(row[:uid])
           result[:tags] = tags(row[:nid]) unless tags(row[:nid]).empty?
           result[:created_at] = created_at(row[:created])
+          result[:updated_at] = created_at(row[:changed])
           result
         end
 
@@ -142,7 +143,13 @@ module Contentful
         end
 
         def convert_boolean_value(value)
-          value.nil? ? nil : (value == 1 ? true : false)
+          if value.nil?
+            nil
+          elsif value.instance_of? String
+            value == 'Yes' ? true : false
+          else
+            value == 1 ? true : false
+          end
         end
 
       end
