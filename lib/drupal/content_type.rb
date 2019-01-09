@@ -64,7 +64,13 @@ module Contentful
 
         def find_related_data(row, result = {})
           schema.each do |key, column_name|
-            result[key] = column_name.is_a?(String) ? fetch_data_from_related_table(row[:nid], column_name) : fetch_custom_tags(row[:nid], column_name)
+            if column_name.is_a?(String)
+              result[key] = fetch_data_from_related_table(row[:nid], column_name)
+            elsif column_name['type']
+              result[key] = fetch_entity_relation(row[:nid], column_name)
+            else
+              result[key] = fetch_custom_tags(row[:nid], column_name)
+            end
           end
           result
         end
@@ -85,9 +91,12 @@ module Contentful
 
         def get_file_id(related_row, table_name)
           file_key = "#{table_name}_fid".to_sym
-          file_id = related_row.first[file_key]
-          file_asset_id = file_id(file_id)
-          link_asset_to_content_type(file_asset_id)
+          related_row.each_with_object([]) do |file_relation, files|
+            file_id = file_relation[file_key]
+            file_asset_id = file_id(file_id)
+            lined_file = link_asset_to_content_type(file_asset_id)
+            files << lined_file
+          end
         end
 
         def file_id(file_id)
@@ -105,6 +114,15 @@ module Contentful
         def related_value(related_rows, table_name)
           value = related_rows.empty? ? nil : related_rows.first[field_name(table_name)]
           convert_type_value(value, table_name)
+        end
+
+        def fetch_entity_relation(entity_id, table_name)
+          relation_table = "field_data_#{table_name['table']}".to_sym
+          node_id = "#{table_name['table']}_target_id".to_sym
+          config.db[relation_table].where(entity_id: entity_id).each_with_object([]) do |content_relation, relations|
+            lined_relation = {type: 'Entry', id: "#{table_name['type']}_#{content_relation[node_id]}"}
+            relations << lined_relation
+          end
         end
 
         def fetch_custom_tags(entity_id, table_name)
